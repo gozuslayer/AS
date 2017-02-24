@@ -32,28 +32,34 @@ local numberTrainingSample = xtrain:size(1)
  -- 3 : Boucle d'apprentissage
 
  -- parametre d'apprentissage
- local learning_rate=0.01  
- local maxEpoch=100
+ local learning_rate=0.001  
+ local maxEpoch=1000
  local all_losses={}
  local timer = torch.Timer()
 
  
 for iteration=1,maxEpoch do
-  ------ Mise à jour des paramètres du modèle
-      ------ Evaluation de la loss moyenne 
-  local loss=0
-    ---- calcul de la loss moyenne 
-    --stockage de la loss moyenne (pour dessin)
   
-     -- version gradient batch
-	model:zeroGradParameters()
-	output = model:forward(xtrain)
-	loss = loss + criterion:forward(output,ytrain)		
-	delta = criterion:backward(output,ytrain)
-	model:backward(xtrain,delta)	
-	model:updateParameters(learning_rate)
+  -- version gradient stochastique
 
+	model:zeroGradParameters()
+  local idx = math.random(xtrain:size(1));
+  x=xtrain[idx]
+  y=ytrain[idx] 
+	output = model:forward(x)	
+ 	delta = criterion:backward(output,y)
+ 	model:backward(x,delta)	
+ 	model:updateParameters(learning_rate)
+
+  local loss=0
+  ---- calcul de la loss moyenne 
   -- store loss for visualisation
+  for j=1,xtrain:size(1) do
+      x=xtrain[j]
+      y=ytrain[j]
+      out=model:forward(x)
+      loss=loss+criterion:forward(out,y)
+  end 
 
   all_losses[iteration]=loss/numberTrainingSample
   print(loss)

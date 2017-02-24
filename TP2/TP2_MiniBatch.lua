@@ -1,6 +1,6 @@
 require 'nn'
 require 'gnuplot'
-require 'tools'
+require 'utils'
 
 --Load Data
 local load_mnist = require 'load_mnist'
@@ -17,13 +17,12 @@ local N=xtrain:size(1) -- nombre de sample
 
 local function accuracy(y,out)
 	local count = 0
-	local Matrix = torch.cmul(y,out)
-	for i =1, #y do
-		if torch.sign(Matrix)>0 then
+	for i =1, y:size(1) do
+		if y[i]*out[i]>0 then
 			count = count + 1
 		end
 	end
-	local result = count/#y
+	local result = count/y:size(1)
 	return result
 end
 
@@ -39,18 +38,16 @@ local criterion= nn.MSECriterion()
  
 -- 3 : Boucle d'apprentissage
 local learning_rate= 1e-3 
-local maxEpoch= 500
+local maxEpoch=50
 local all_losses={}
 local size_minibatch = 10
+local Blocs = torch.round(N/size_minibatch)
 local timer = torch.Timer()
 
 
 for iteration=1,maxEpoch do
-   	------ Evaluation de la loss moyenne 
     
     local loss=0  
-    local x,y,out,delta
-  
     ---- calcul de la loss moyenne 
  	for j=1,xtrain:size(1) do
 		x=xtrain[j]
@@ -61,25 +58,30 @@ for iteration=1,maxEpoch do
     loss=loss/N	
     all_losses[iteration]=loss  --stockage de la loss moyenne (pour dessin)
 
-    -- version gradient stochastique
-    model:zeroGradParameters()
+    -- version gradient minibatch
+
+    --get index of each minibatch
     local idx = torch.randperm(N)
-    local MiniBatch_X = torch.Tensor(size_minibatch)
-    local MiniBatch_Y = torch.Tensor(size_minibatch)
-    for i=1,size_minibatch do
-        MiniBatch_X[i] = xtrain[idx[i]]
-        MiniBatch_Y[i] = ytrain[idx[i]] 
+    local index_MiniBatch_X = idx:chunk(Blocs,1)
+    local index_MiniBatch_Y = idx:chunk(Blocs,1)
+
+    
+    for i=1,Blocs do
+
+        model:zeroGradParameters()
+        MiniBatch_X = xtrain:index(1,index_MiniBatch_X[i]:long())
+        MiniBatch_Y = ytrain:index(1,index_MiniBatch_Y[i]:long())
             	
-    out=model:forward(MiniBatch_X)
-    loss=criterion:forward(out,MiniBatch_Y)
-    delta=criterion:backward(out,MiniBatch_Y)
-    model:backward(MiniBatch_X,delta) 
-    model:updateParameters(learning_rate)  
+        out=model:forward(MiniBatch_X)
+        delta=criterion:backward(out,MiniBatch_Y)
+        model:backward(MiniBatch_X,delta) 
+        model:updateParameters(learning_rate)  
+    end
 
 
     -- plot de la frontiere ou plot du loss (utiliser l'un ou l'autre)
     --plot(xs,ys,model,100)  -- uniquement si DIMENSION=2
-    gnuplot.plot(torch.Tensor(all_losses)) 
+    --gnuplot.plot(torch.Tensor(all_losses)) 
 end
 
 local function prediction(xtest,ytest)
